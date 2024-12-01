@@ -1,0 +1,332 @@
+import sqlite3
+from tkinter import Tk, Label, Button, Entry, StringVar, messagebox, Frame, Canvas, Scrollbar
+
+# Initialize the SQLite database
+def initialize_database():
+    conn = sqlite3.connect("FinanceTracker.db")
+    cursor = conn.cursor()
+
+    # Create the Budget table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Budget (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            month TEXT NOT NULL,
+            total_budget REAL NOT NULL,
+            username TEXT NOT NULL
+        )
+    """)
+
+    # Create the Income table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Income (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL,
+            username TEXT NOT NULL
+        )
+    """)
+
+    # Create the Investments table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Investments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL,
+            username TEXT NOT NULL
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+# Function to track budget
+def track_budget():
+    month = month_var.get().strip()
+    budget = budget_var.get().strip()
+    username = username_var.get().strip()
+
+    if not month or not budget or not username:
+        messagebox.showerror("Input Error", "All fields are required!")
+        return
+
+    try:
+        budget = float(budget)
+        if budget <= 0:
+            raise ValueError("Budget must be a positive number.")
+        conn = sqlite3.connect("FinanceTracker.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO Budget (month, total_budget, username) VALUES (?, ?, ?)", 
+                       (month, budget, username))
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", f"Budget for {month} saved successfully!")
+    except ValueError as ve:
+        messagebox.showerror("Input Error", f"Invalid budget: {ve}")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
+# Function to track income
+def track_income():
+    source = source_var.get().strip()
+    amount = income_var.get().strip()
+    date = date_var.get().strip()
+    username = username_var.get().strip()
+
+    if not source or not amount or not date or not username:
+        messagebox.showerror("Input Error", "All fields are required!")
+        return
+
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError("Income must be a positive number.")
+        conn = sqlite3.connect("FinanceTracker.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO Income (source, amount, date, username) VALUES (?, ?, ?, ?)", 
+                       (source, amount, date, username))
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", f"Income from {source} added successfully!")
+    except ValueError as ve:
+        messagebox.showerror("Input Error", f"Invalid income: {ve}")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
+# Function to track investments
+def track_investment():
+    inv_type = type_var.get().strip()
+    amount = investment_var.get().strip()
+    date = inv_date_var.get().strip()
+    username = username_var.get().strip()
+
+    if not inv_type or not amount or not date or not username:
+        messagebox.showerror("Input Error", "All fields are required!")
+        return
+
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError("Investment must be a positive number.")
+        conn = sqlite3.connect("FinanceTracker.db")
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO Investments (type, amount, date, username) VALUES (?, ?, ?, ?)", 
+                       (inv_type, amount, date, username))
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", f"Investment in {inv_type} added successfully!")
+    except ValueError as ve:
+        messagebox.showerror("Input Error", f"Invalid investment: {ve}")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
+# Function to manage budget
+def manage_budget():
+    month = month_var.get().strip()
+    new_budget = budget_var.get().strip()
+    username = username_var.get().strip()
+
+    if not month or not new_budget or not username:
+        messagebox.showerror("Input Error", "All fields are required!")
+        return
+
+    try:
+        new_budget = float(new_budget)
+        if new_budget <= 0:
+            raise ValueError("Budget must be a positive number.")
+        conn = sqlite3.connect("FinanceTracker.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM Budget WHERE month = ? AND username = ?", (month, username))
+        record = cursor.fetchone()
+
+        if record:
+            cursor.execute("UPDATE Budget SET total_budget = ? WHERE month = ? AND username = ?", 
+                           (new_budget, month, username))
+            conn.commit()
+            messagebox.showinfo("Success", f"Budget for {month} updated successfully!")
+        else:
+            messagebox.showerror("Not Found", f"No budget found for {month} and user {username}.")
+        conn.close()
+    except ValueError as ve:
+        messagebox.showerror("Input Error", f"Invalid budget: {ve}")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
+# Function to track expenses
+def track_expenses():
+    living_exp = living_exp_var.get().strip()
+    transport_exp = transport_exp_var.get().strip()
+    misc_exp = misc_exp_var.get().strip()
+    username = username_var.get().strip()
+    month = month_var.get().strip()
+
+    if not living_exp or not transport_exp or not misc_exp or not username or not month:
+        messagebox.showerror("Input Error", "All fields are required!")
+        return
+
+    try:
+        living_exp = float(living_exp)
+        transport_exp = float(transport_exp)
+        misc_exp = float(misc_exp)
+        if living_exp < 0 or transport_exp < 0 or misc_exp < 0:
+            raise ValueError("Expenses cannot be negative.")
+
+        total_exp = living_exp + transport_exp + misc_exp
+        conn = sqlite3.connect("FinanceTracker.db")
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT total_budget FROM Budget WHERE month = ? AND username = ?", (month, username))
+        record = cursor.fetchone()
+        if record:
+            remaining_budget = record[0] - total_exp
+            if remaining_budget < 0:
+                messagebox.showwarning("Budget Exceeded", "Expenses exceed your budget!")
+            cursor.execute("UPDATE Budget SET total_budget = ? WHERE month = ? AND username = ?", 
+                           (remaining_budget, month, username))
+            conn.commit()
+            messagebox.showinfo("Success", f"Expenses recorded. Remaining budget: {remaining_budget:.2f}")
+        else:
+            messagebox.showerror("Not Found", "No budget found for the specified month and user.")
+        conn.close()
+    except ValueError as ve:
+        messagebox.showerror("Input Error", f"Invalid expense: {ve}")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
+# Function to view all records
+def view_all_records():
+    username = username_var.get().strip()
+
+    if not username:
+        messagebox.showerror("Input Error", "Please enter your name to view records!")
+        return
+
+    try:
+        conn = sqlite3.connect("FinanceTracker.db")
+        cursor = conn.cursor()
+
+        all_records = ""
+
+        cursor.execute("SELECT month, total_budget FROM Budget WHERE username = ?", (username,))
+        budget_records = cursor.fetchall()
+        if budget_records:
+            all_records += "--- Budget Records ---\n"
+            for record in budget_records:
+                all_records += f"Month: {record[0]}, Budget: {record[1]:.2f}\n"
+
+        cursor.execute("SELECT source, amount, date FROM Income WHERE username = ?", (username,))
+        income_records = cursor.fetchall()
+        if income_records:
+            all_records += "\n--- Income Records ---\n"
+            for record in income_records:
+                all_records += f"Source: {record[0]}, Amount: {record[1]:.2f}, Date: {record[2]}\n"
+
+        cursor.execute("SELECT type, amount, date FROM Investments WHERE username = ?", (username,))
+        investment_records = cursor.fetchall()
+        if investment_records:
+            all_records += "\n--- Investment Records ---\n"
+            for record in investment_records:
+                all_records += f"Type: {record[0]}, Amount: {record[1]:.2f}, Date: {record[2]}\n"
+
+        if not all_records.strip():
+            all_records = "No records found for this user."
+
+        messagebox.showinfo("All Records", all_records)
+        conn.close()
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
+# Create the UI
+def create_ui():
+    global month_var, budget_var, source_var, income_var, date_var, type_var, investment_var, inv_date_var, username_var
+    global living_exp_var, transport_exp_var, misc_exp_var
+
+    root = Tk()
+    root.title("Finance Tracker")
+    root.geometry("600x600")  # Set a fixed window size
+
+    # Scrollable Frame
+    canvas = Canvas(root, width=580)
+    scrollbar = Scrollbar(root, orient="vertical", command=canvas.yview)
+    scrollable_frame = Frame(canvas)
+
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+    )
+
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    # Variables for inputs
+    month_var = StringVar()
+    budget_var = StringVar()
+    source_var = StringVar()
+    income_var = StringVar()
+    date_var = StringVar()
+    type_var = StringVar()
+    investment_var = StringVar()
+    inv_date_var = StringVar()
+    username_var = StringVar()
+    living_exp_var = StringVar()
+    transport_exp_var = StringVar()
+    misc_exp_var = StringVar()
+
+    # UI components
+    Label(scrollable_frame, text="Finance Tracker", font=("Arial", 18, "bold")).pack(pady=10)
+
+    # Username Section
+    Label(scrollable_frame, text="Enter Your Name:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=username_var, font=("Arial", 12), width=40).pack(pady=5)
+
+    # Budget Section
+    Label(scrollable_frame, text="--- Budget Management ---", font=("Arial", 14, "bold")).pack(pady=10)
+    Label(scrollable_frame, text="Enter Month:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=month_var, font=("Arial", 12), width=40).pack(pady=5)
+    Label(scrollable_frame, text="Enter Budget:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=budget_var, font=("Arial", 12), width=40).pack(pady=5)
+    Button(scrollable_frame, text="Save Budget", command=track_budget, font=("Arial", 12)).pack(pady=5)
+    Button(scrollable_frame, text="Manage Budget", command=manage_budget, font=("Arial", 12)).pack(pady=5)
+
+    # Income Section
+    Label(scrollable_frame, text="--- Income Tracking ---", font=("Arial", 14, "bold")).pack(pady=10)
+    Label(scrollable_frame, text="Enter Income Source:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=source_var, font=("Arial", 12), width=40).pack(pady=5)
+    Label(scrollable_frame, text="Enter Income Amount:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=income_var, font=("Arial", 12), width=40).pack(pady=5)
+    Label(scrollable_frame, text="Enter Income Date (YYYY-MM-DD):", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=date_var, font=("Arial", 12), width=40).pack(pady=5)
+    Button(scrollable_frame, text="Track Income", command=track_income, font=("Arial", 12)).pack(pady=5)
+
+    # Investment Section
+    Label(scrollable_frame, text="--- Investment Tracking ---", font=("Arial", 14, "bold")).pack(pady=10)
+    Label(scrollable_frame, text="Enter Investment Type:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=type_var, font=("Arial", 12), width=40).pack(pady=5)
+    Label(scrollable_frame, text="Enter Investment Amount:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=investment_var, font=("Arial", 12), width=40).pack(pady=5)
+    Label(scrollable_frame, text="Enter Investment Date (YYYY-MM-DD):", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=inv_date_var, font=("Arial", 12), width=40).pack(pady=5)
+    Button(scrollable_frame, text="Track Investment", command=track_investment, font=("Arial", 12)).pack(pady=5)
+
+    # Expense Section
+    Label(scrollable_frame, text="--- Expense Tracking ---", font=("Arial", 14, "bold")).pack(pady=10)
+    Label(scrollable_frame, text="Enter Living Expenses:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=living_exp_var, font=("Arial", 12), width=40).pack(pady=5)
+    Label(scrollable_frame, text="Enter Transportation Expenses:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=transport_exp_var, font=("Arial", 12), width=40).pack(pady=5)
+    Label(scrollable_frame, text="Enter Miscellaneous Expenses:", font=("Arial", 12)).pack(pady=5)
+    Entry(scrollable_frame, textvariable=misc_exp_var, font=("Arial", 12), width=40).pack(pady=5)
+    Button(scrollable_frame, text="Track Expenses", command=track_expenses, font=("Arial", 12)).pack(pady=5)
+
+    # View Records Section
+    Button(scrollable_frame, text="View All Records", command=view_all_records, font=("Arial", 14), bg="lightblue").pack(pady=15)
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    initialize_database()
+    create_ui()
